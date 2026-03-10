@@ -1,0 +1,574 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
+  <title>Shap-Shift</title>
+  <style>
+    :root {
+      --bg: #aeb6ea;
+      --panel: #c4c9ef;
+      --text: #832b61;
+      --board: #bcc2ee;
+      --grid: rgba(255, 255, 255, 0.2);
+      --snake: #b2ac88;
+      --snake-head: #8f8867;
+      --snake-stroke: #6f6a4f;
+      --food: #2d2438;
+      --btn: #efe9d8;
+      --btn-text: #7e2b58;
+    }
+
+    * {
+      box-sizing: border-box;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    body {
+      margin: 0;
+      font-family: "Inter", "Helvetica Neue", Helvetica, Arial, sans-serif;
+      background: radial-gradient(circle at 50% 15%, #c5c9f2 0%, var(--bg) 55%, #98a1dd 100%);
+      color: var(--text);
+      min-height: 100dvh;
+      display: flex;
+      justify-content: center;
+      align-items: stretch;
+      padding: 10px;
+    }
+
+    .app {
+      width: min(100%, 460px);
+      background: color-mix(in srgb, var(--panel) 85%, white);
+      border: 1px solid rgba(255, 255, 255, 0.35);
+      border-radius: 20px;
+      box-shadow: 0 20px 45px rgba(54, 58, 111, 0.3);
+      padding: 12px;
+      display: grid;
+      grid-template-rows: auto auto auto 1fr auto auto;
+      gap: 10px;
+    }
+
+    .topbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+    }
+
+    .title {
+      margin: 0;
+      font-size: 1.4rem;
+      letter-spacing: 0.2px;
+      font-weight: 600;
+      color: var(--text);
+    }
+
+    .score {
+      margin: 0;
+      font-weight: 600;
+      font-size: 0.95rem;
+      white-space: nowrap;
+    }
+
+    .status {
+      margin: 0;
+      min-height: 1.2em;
+      font-size: 0.92rem;
+      opacity: 0.95;
+    }
+
+    .themes {
+      display: flex;
+      gap: 8px;
+      overflow-x: auto;
+      padding-bottom: 2px;
+    }
+
+    .theme-btn {
+      border: 1px solid rgba(255, 255, 255, 0.45);
+      border-radius: 999px;
+      background: rgba(255, 255, 255, 0.4);
+      color: #3e3e57;
+      padding: 8px 11px;
+      font-size: 0.8rem;
+      font-weight: 600;
+      cursor: pointer;
+      white-space: nowrap;
+    }
+
+    .theme-btn.active {
+      outline: 2px solid rgba(255, 255, 255, 0.65);
+      background: rgba(255, 255, 255, 0.65);
+    }
+
+    .board-wrap {
+      width: 100%;
+      max-width: 420px;
+      aspect-ratio: 1 / 1;
+      margin: 0 auto;
+      border-radius: 12px;
+      border: 1.5px solid rgba(255, 255, 255, 0.5);
+      overflow: hidden;
+      background: var(--board);
+      touch-action: none;
+    }
+
+    canvas {
+      display: block;
+      width: 100%;
+      height: 100%;
+      background: var(--board);
+    }
+
+    .controls {
+      margin-top: 4px;
+      display: grid;
+      grid-template-columns: repeat(3, 64px);
+      grid-template-rows: repeat(2, 54px);
+      gap: 8px;
+      justify-content: center;
+      align-content: center;
+    }
+
+    .control-btn {
+      border: 0;
+      border-radius: 12px;
+      background: color-mix(in srgb, var(--btn) 88%, white);
+      color: var(--btn-text);
+      font-size: 1.1rem;
+      font-weight: 700;
+      box-shadow: inset 0 -2px 0 rgba(0, 0, 0, 0.08);
+      cursor: pointer;
+    }
+
+    .control-btn:active {
+      transform: translateY(1px);
+    }
+
+    .up { grid-column: 2; grid-row: 1; }
+    .left { grid-column: 1; grid-row: 2; }
+    .down { grid-column: 2; grid-row: 2; }
+    .right { grid-column: 3; grid-row: 2; }
+
+    .actions {
+      display: flex;
+      justify-content: center;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    .action-btn {
+      border: 1px solid rgba(255, 255, 255, 0.45);
+      background: color-mix(in srgb, var(--btn) 86%, white);
+      color: var(--btn-text);
+      border-radius: 999px;
+      padding: 10px 14px;
+      font-weight: 700;
+      cursor: pointer;
+    }
+
+    .overlay {
+      position: fixed;
+      inset: 0;
+      display: none;
+      place-items: center;
+      background: rgba(35, 33, 66, 0.42);
+      backdrop-filter: blur(2px);
+      z-index: 10;
+      padding: 16px;
+    }
+
+    .overlay.show { display: grid; }
+
+    .modal {
+      width: min(100%, 380px);
+      background: #efe8d9;
+      color: #7e2b58;
+      border: 2px solid #bcc8ad;
+      border-radius: 14px;
+      padding: 18px;
+      text-align: center;
+    }
+
+    .modal h2 {
+      margin: 0 0 8px;
+      font-size: 1.7rem;
+      line-height: 1.2;
+      font-weight: 500;
+    }
+
+    .muted {
+      margin: 0 0 14px;
+      color: #675f4d;
+    }
+  </style>
+</head>
+<body>
+  <main class="app">
+    <header class="topbar">
+      <h1 class="title">Shap-Shift</h1>
+      <p class="score">Pearl Count: <span id="score">0</span></p>
+    </header>
+
+    <p class="status" id="statusText">The Target: A single matte boba pearl.</p>
+
+    <section class="themes" aria-label="Theme selector">
+      <button class="theme-btn active" data-theme="lavender">Thai Milk Tea</button>
+      <button class="theme-btn" data-theme="mint">Pearl Milk Tea</button>
+      <button class="theme-btn" data-theme="sunset">Brown Sugar Pearls</button>
+    </section>
+
+    <div class="board-wrap">
+      <canvas id="gameCanvas" width="420" height="420" aria-label="Shap-Shift board"></canvas>
+    </div>
+
+    <div class="controls" aria-label="Touch controls">
+      <button class="control-btn up" data-dir="up">▲</button>
+      <button class="control-btn left" data-dir="left">◀</button>
+      <button class="control-btn down" data-dir="down">▼</button>
+      <button class="control-btn right" data-dir="right">▶</button>
+    </div>
+
+    <div class="actions">
+      <button id="restartBtnInline" class="action-btn">Refill?</button>
+      <button id="shareBtn" class="action-btn">Share</button>
+    </div>
+  </main>
+
+  <div id="gameOverOverlay" class="overlay" role="dialog" aria-modal="true">
+    <div class="modal">
+      <h2>Bit of a clumsy exit, but okay.</h2>
+      <p class="muted">Pearl Count: <strong id="finalScore">0</strong></p>
+      <button id="restartBtnOverlay" class="action-btn">Refill?</button>
+    </div>
+  </div>
+
+  <script>
+    const GRID_SIZE = 20;
+    const CELL_SIZE = 21;
+    const GAME_SPEED = 150;
+
+    const THEMES = {
+      lavender: {
+        "--bg": "#aeb6ea",
+        "--panel": "#c4c9ef",
+        "--text": "#a74174",
+        "--board": "#bcc2ee",
+        "--grid": "rgba(255,255,255,0.2)",
+        "--snake": "#b2ac88",
+        "--snake-head": "#8f8867",
+        "--snake-stroke": "#6f6a4f",
+        "--food": "#2d2438",
+        "--btn": "#efe9d8",
+        "--btn-text": "#7e2b58"
+      },
+      mint: {
+        "--bg": "#b8ddd5",
+        "--panel": "#cce9e2",
+        "--text": "#35666a",
+        "--board": "#b2d9cf",
+        "--grid": "rgba(255,255,255,0.22)",
+        "--snake": "#8ea786",
+        "--snake-head": "#708a69",
+        "--snake-stroke": "#51634d",
+        "--food": "#2f2b33",
+        "--btn": "#e7f1dc",
+        "--btn-text": "#3e6a58"
+      },
+      sunset: {
+        "--bg": "#e9b7c7",
+        "--panel": "#f2c6d3",
+        "--text": "#82425f",
+        "--board": "#eab7c8",
+        "--grid": "rgba(255,255,255,0.24)",
+        "--snake": "#b8ad85",
+        "--snake-head": "#97895f",
+        "--snake-stroke": "#6f6548",
+        "--food": "#362736",
+        "--btn": "#f4e4d7",
+        "--btn-text": "#7b3d56"
+      }
+    };
+
+    const canvas = document.getElementById("gameCanvas");
+    const ctx = canvas.getContext("2d");
+    canvas.width = GRID_SIZE * CELL_SIZE;
+    canvas.height = GRID_SIZE * CELL_SIZE;
+
+    const scoreEl = document.getElementById("score");
+    const statusEl = document.getElementById("statusText");
+    const overlay = document.getElementById("gameOverOverlay");
+    const finalScoreEl = document.getElementById("finalScore");
+    const restartBtnOverlay = document.getElementById("restartBtnOverlay");
+    const restartBtnInline = document.getElementById("restartBtnInline");
+    const shareBtn = document.getElementById("shareBtn");
+    const themeBtns = [...document.querySelectorAll(".theme-btn")];
+    const controlBtns = [...document.querySelectorAll(".control-btn")];
+
+    let snake = [];
+    let direction = { x: 1, y: 0 };
+    let nextDirection = { x: 1, y: 0 };
+    let food = { x: 0, y: 0 };
+    let score = 0;
+    let isGameOver = false;
+    let gameTimer = null;
+    let ripples = [];
+    let statusTimer = null;
+    let touchStart = null;
+
+    function initGame() {
+      snake = [
+        { x: 10, y: 10 },
+        { x: 9, y: 10 },
+        { x: 8, y: 10 }
+      ];
+      direction = { x: 1, y: 0 };
+      nextDirection = { x: 1, y: 0 };
+      score = 0;
+      isGameOver = false;
+      ripples = [];
+      scoreEl.textContent = String(score).padStart(2, "0");
+      overlay.classList.remove("show");
+      setStatus("The Target: A single matte boba pearl.");
+      spawnFood();
+      draw();
+
+      clearInterval(gameTimer);
+      gameTimer = setInterval(gameLoop, GAME_SPEED);
+    }
+
+    function gameLoop() {
+      if (isGameOver) return;
+      direction = nextDirection;
+
+      const head = { x: snake[0].x + direction.x, y: snake[0].y + direction.y };
+
+      if (head.x < 0 || head.x >= GRID_SIZE || head.y < 0 || head.y >= GRID_SIZE) {
+        endGame();
+        return;
+      }
+      if (snake.some((part) => part.x === head.x && part.y === head.y)) {
+        endGame();
+        return;
+      }
+
+      snake.unshift(head);
+
+      if (head.x === food.x && head.y === food.y) {
+        score += 1;
+        scoreEl.textContent = String(score).padStart(2, "0");
+        ripples.push({ x: food.x, y: food.y, born: performance.now(), duration: 250 });
+        setStatus("Is this... talent?", 850);
+        spawnFood();
+      } else {
+        snake.pop();
+      }
+
+      draw();
+    }
+
+    function spawnFood() {
+      do {
+        food = {
+          x: Math.floor(Math.random() * GRID_SIZE),
+          y: Math.floor(Math.random() * GRID_SIZE)
+        };
+      } while (snake.some((part) => part.x === food.x && part.y === food.y));
+    }
+
+    function draw() {
+      ctx.fillStyle = getCssVar("--board");
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+      ctx.strokeStyle = getCssVar("--grid");
+      for (let i = 0; i <= GRID_SIZE; i++) {
+        const p = i * CELL_SIZE;
+        ctx.beginPath();
+        ctx.moveTo(p, 0);
+        ctx.lineTo(p, canvas.height);
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.moveTo(0, p);
+        ctx.lineTo(canvas.width, p);
+        ctx.stroke();
+      }
+
+      drawFood();
+      drawRipples();
+      drawSnake();
+    }
+
+    function drawFood() {
+      const now = performance.now();
+      const pulse = 1 + 0.05 * Math.sin(now / 220);
+      const radius = (CELL_SIZE * 0.36) * pulse;
+      const centerX = food.x * CELL_SIZE + CELL_SIZE / 2;
+      const centerY = food.y * CELL_SIZE + CELL_SIZE / 2;
+      ctx.fillStyle = getCssVar("--food");
+      ctx.beginPath();
+      ctx.arc(centerX, centerY, radius, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    function drawRipples() {
+      const now = performance.now();
+      ripples = ripples.filter((r) => now - r.born < r.duration);
+      ripples.forEach((r) => {
+        const t = (now - r.born) / r.duration;
+        const x = r.x * CELL_SIZE + CELL_SIZE / 2;
+        const y = r.y * CELL_SIZE + CELL_SIZE / 2;
+        ctx.globalAlpha = 1 - t;
+        ctx.lineWidth = 2;
+        ctx.strokeStyle = "rgba(124, 183, 219, 0.8)";
+        ctx.beginPath();
+        ctx.arc(x, y, CELL_SIZE * (0.35 + 0.8 * t), 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.globalAlpha = 1;
+      });
+    }
+
+    function drawSnake() {
+      snake.forEach((part, idx) => {
+        const pad = 1;
+        const x = part.x * CELL_SIZE + pad;
+        const y = part.y * CELL_SIZE + pad;
+        const size = CELL_SIZE - pad * 2;
+        const radius = Math.max(4, CELL_SIZE * 0.24);
+
+        ctx.fillStyle = idx === 0 ? getCssVar("--snake-head") : getCssVar("--snake");
+        roundRect(ctx, x, y, size, size, radius);
+        ctx.fill();
+        ctx.lineWidth = 1.4;
+        ctx.strokeStyle = getCssVar("--snake-stroke");
+        ctx.stroke();
+      });
+
+      // Direction marker on head to improve clarity on mobile.
+      const head = snake[0];
+      const cx = head.x * CELL_SIZE + CELL_SIZE / 2 + direction.x * CELL_SIZE * 0.18;
+      const cy = head.y * CELL_SIZE + CELL_SIZE / 2 + direction.y * CELL_SIZE * 0.18;
+      ctx.fillStyle = "rgba(255,255,255,0.88)";
+      ctx.beginPath();
+      ctx.arc(cx, cy, Math.max(2.2, CELL_SIZE * 0.1), 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    function setDirectionByName(name) {
+      if (name === "up" && direction.y !== 1) nextDirection = { x: 0, y: -1 };
+      if (name === "down" && direction.y !== -1) nextDirection = { x: 0, y: 1 };
+      if (name === "left" && direction.x !== 1) nextDirection = { x: -1, y: 0 };
+      if (name === "right" && direction.x !== -1) nextDirection = { x: 1, y: 0 };
+    }
+
+    function endGame() {
+      isGameOver = true;
+      clearInterval(gameTimer);
+      finalScoreEl.textContent = String(score).padStart(2, "0");
+      overlay.classList.add("show");
+    }
+
+    function setStatus(text, resetAfterMs) {
+      statusEl.textContent = text;
+      if (statusTimer) clearTimeout(statusTimer);
+      if (resetAfterMs) {
+        statusTimer = setTimeout(() => {
+          if (!isGameOver) statusEl.textContent = "The Target: A single matte boba pearl.";
+        }, resetAfterMs);
+      }
+    }
+
+    function applyTheme(themeName) {
+      const theme = THEMES[themeName];
+      if (!theme) return;
+      Object.entries(theme).forEach(([k, v]) => document.documentElement.style.setProperty(k, v));
+      themeBtns.forEach((btn) => btn.classList.toggle("active", btn.dataset.theme === themeName));
+      localStorage.setItem("shap_shift_theme", themeName);
+    }
+
+    function getCssVar(name) {
+      return getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+    }
+
+    function roundRect(context, x, y, w, h, r) {
+      const radius = Math.min(r, w / 2, h / 2);
+      context.beginPath();
+      context.moveTo(x + radius, y);
+      context.lineTo(x + w - radius, y);
+      context.quadraticCurveTo(x + w, y, x + w, y + radius);
+      context.lineTo(x + w, y + h - radius);
+      context.quadraticCurveTo(x + w, y + h, x + w - radius, y + h);
+      context.lineTo(x + radius, y + h);
+      context.quadraticCurveTo(x, y + h, x, y + h - radius);
+      context.lineTo(x, y + radius);
+      context.quadraticCurveTo(x, y, x + radius, y);
+      context.closePath();
+    }
+
+    // Keyboard fallback for desktop testing.
+    document.addEventListener("keydown", (e) => {
+      if (e.key === "ArrowUp") setDirectionByName("up");
+      if (e.key === "ArrowDown") setDirectionByName("down");
+      if (e.key === "ArrowLeft") setDirectionByName("left");
+      if (e.key === "ArrowRight") setDirectionByName("right");
+      if (isGameOver && e.key === "Enter") initGame();
+    });
+
+    // Touch D-pad buttons.
+    controlBtns.forEach((btn) => {
+      btn.addEventListener("click", () => setDirectionByName(btn.dataset.dir));
+    });
+
+    // Swipe support on board.
+    canvas.addEventListener("touchstart", (e) => {
+      const t = e.changedTouches[0];
+      touchStart = { x: t.clientX, y: t.clientY };
+    }, { passive: true });
+
+    canvas.addEventListener("touchend", (e) => {
+      if (!touchStart) return;
+      const t = e.changedTouches[0];
+      const dx = t.clientX - touchStart.x;
+      const dy = t.clientY - touchStart.y;
+      const absX = Math.abs(dx);
+      const absY = Math.abs(dy);
+      if (Math.max(absX, absY) < 18) return;
+      if (absX > absY) setDirectionByName(dx > 0 ? "right" : "left");
+      else setDirectionByName(dy > 0 ? "down" : "up");
+      touchStart = null;
+    }, { passive: true });
+
+    // Theme switching
+    themeBtns.forEach((btn) => {
+      btn.addEventListener("click", () => applyTheme(btn.dataset.theme));
+    });
+
+    // Restart buttons
+    restartBtnOverlay.addEventListener("click", initGame);
+    restartBtnInline.addEventListener("click", initGame);
+
+    // Share button
+    shareBtn.addEventListener("click", async () => {
+      const url = location.href;
+      if (navigator.share) {
+        try {
+          await navigator.share({ title: "Shap-Shift", text: "Play Shap-Shift on mobile", url });
+        } catch (_) {
+          // User closed share dialog; no action needed.
+        }
+      } else {
+        try {
+          await navigator.clipboard.writeText(url);
+          setStatus("Link copied. Send it to your friends.", 1400);
+        } catch (_) {
+          setStatus("Copy failed. Copy URL from browser address bar.", 1800);
+        }
+      }
+    });
+
+    // First load
+    const savedTheme = localStorage.getItem("shap_shift_theme") || "lavender";
+    applyTheme(savedTheme);
+    initGame();
+  </script>
+</body>
+</html>
